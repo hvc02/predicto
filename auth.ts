@@ -4,10 +4,13 @@ import { prisma } from "@/lib/db";
 
 function isAdmin(email: string): boolean {
   const list = process.env.ADMIN_EMAILS ?? "";
-  return list.split(",").some((e) => e.trim().toLowerCase() === email.toLowerCase());
+  return list
+    .split(",")
+    .some((e) => e.trim().toLowerCase() === email.toLowerCase());
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true, // required for Vercel and other serverless hosts
   providers: [
     Credentials({
       name: "Credentials",
