@@ -1,0 +1,90 @@
+// Predicto MVP - backend data model (no blockchain)
+// Balance in cents/smallest unit for precision
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  balance   Int      @default(0) // cents or smallest unit
+  role      String?  @default("user") // "user" | "admin"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  marketsCreated   Market[]           @relation("CreatedBy")
+  bets             Bet[]
+  claims           Claim[]
+  walletTransactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // DEPOSIT | WITHDRAWAL | BET | CLAIM
+  amount      Int      // signed: positive = credit, negative = debit (cents)
+  status      String   @default("COMPLETED") // PENDING | COMPLETED | FAILED
+  referenceId String?  // razorpay payment_id/order_id, or bet/claim id
+  description String?  // e.g. "Deposit via Razorpay", "Bet on market XYZ"
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("Transaction")
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Market {
+  id         String    @id @default(cuid())
+  question   String
+  totalYes   Int       @default(0) // cents
+  totalNo    Int       @default(0)
+  resolved   Boolean   @default(false)
+  outcomeYes Boolean?  // true = YES won; set when resolved
+  createdById String
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  createdBy User   @relation("CreatedBy", fields: [createdById], references: [id])
+  bets     Bet[]
+  claims   Claim[]
+
+  @@index([resolved])
+}
+
+model Bet {
+  id        String   @id @default(cuid())
+  marketId  String
+  userId    String
+  side      String   // "yes" | "no"
+  amount    Int      // cents
+  createdAt DateTime @default(now())
+
+  market Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([marketId])
+  @@index([userId])
+}
+
+model Claim {
+  id            String   @id @default(cuid())
+  marketId      String
+  userId        String
+  amountClaimed Int      // cents
+  createdAt     DateTime @default(now())
+
+  market Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([marketId, userId])
+  @@index([marketId])
+  @@index([userId])
+}
